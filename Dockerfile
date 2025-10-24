@@ -1,5 +1,5 @@
 # Dockerfile
-FROM debian:stable-slim
+FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Europe/Berlin
@@ -9,7 +9,8 @@ RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       ca-certificates curl tar xz-utils \
-      lib32gcc-s1 lib32stdc++6 libtinfo5:i386 libncurses5:i386 \
+      lib32gcc-s1 lib32stdc++6 \
+      zlib1g:i386 libtinfo6:i386 libcurl4:i386 libssl3:i386 \
       tini openssh-server gosu tzdata jq \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,8 +22,6 @@ RUN mkdir -p "$STEAMCMD_DIR" && \
     ln -s "$STEAMCMD_DIR/steamcmd.sh" /usr/local/bin/steamcmd
 
 # --- Create users and dirs ---
-# - 'steam' runs the gameserver (non-root)
-# - 'dev' is for SSH (VS Code Remote-SSH)
 ENV GMOD_DIR=/gmod \
     STEAM_HOME=/steam
 RUN useradd -m -d /home/steam -s /bin/bash steam && \
@@ -59,8 +58,6 @@ COPY entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
 
 # --- Expose ports ---
-# Game/Query: 27015 UDP (game) + 27015 TCP (RCON/query), Client: 27005 UDP, TV: 27020 UDP
-# SSH: 22 TCP
 EXPOSE 27015/udp 27015/tcp 27005/udp 27020/udp 22/tcp
 
 # --- Volumes for persistence ---
@@ -69,6 +66,5 @@ VOLUME ["/gmod", "/steam"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
   CMD pgrep -f "/gmod/srcds_linux" >/dev/null || exit 1
 
-# Use tini as PID1; keep SSH and SRCDS under one entrypoint
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/local/bin/entrypoint"]
